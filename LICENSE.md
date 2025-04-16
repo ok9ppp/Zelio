@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2023-2024 Your Name or Your Organization
+Copyright (c) 2023-2024 ok9ppp (1004469200@qq.com)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
