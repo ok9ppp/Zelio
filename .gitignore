@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs
+*.log
+logs/
+app_debug.log
+app.log
+server.log
+
+# Uploads
+uploads/
+
+# Temp files
+temp_output/
+*.bak
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+
+# MongoDB
+*.wt
+*.lock
+*.bson
+*.json
+*.0
+*.1
+*.2
+mongod.lock
+
+# Specific project files
+token.txt 
