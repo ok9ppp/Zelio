@@ -1,0 +1,20 @@
+
+# 在GetCardDetail类的get方法中，添加以下代码
+# 添加到记录频次信息的代码之后，return之前
+
+# 添加操作难度评分、时间成本评分和生活干扰评分到顶层，方便前端访问
+if 'operation_difficulty_score' in card_data['detail_page']:
+    card_data['complexity_score'] = card_data['detail_page']['operation_difficulty_score']
+    card_data['操作难度评分'] = card_data['detail_page']['operation_difficulty_score']
+    card_data['复杂度评分'] = card_data['detail_page']['operation_difficulty_score']
+    logger.info(f"Cards API - 卡片操作难度评分: {card_id}, 值: {card_data['complexity_score']}")
+
+if 'time_cost_score' in card_data['detail_page']:
+    card_data['time_cost_score'] = card_data['detail_page']['time_cost_score']
+    card_data['时间成本评分'] = card_data['detail_page']['time_cost_score']
+    logger.info(f"Cards API - 卡片时间成本评分: {card_id}, 值: {card_data['time_cost_score']}")
+
+if 'life_interference_score' in card_data['detail_page']:
+    card_data['life_interference_score'] = card_data['detail_page']['life_interference_score']
+    card_data['生活干扰评分'] = card_data['detail_page']['life_interference_score']
+    logger.info(f"Cards API - 卡片生活干扰评分: {card_id}, 值: {card_data['life_interference_score']}")
