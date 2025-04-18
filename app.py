@@ -24,7 +24,6 @@ import urllib.parse
 import math
 import re
 from deepseek_client import DeepSeekClient
-import deepseek_prompts as dp  # 导入新创建的模块
 
 # 创建logs目录（如果不存在）
 os.makedirs('logs', exist_ok=True)
@@ -1734,83 +1733,22 @@ class ChatWithDeepSeek(Resource):
     @jwt_required()
     def post(self):
         try:
-            # 获取当前用户ID
             current_user_id = get_jwt_identity()
             
-            # 获取请求数据
             data = request.get_json()
             
-            if not data:
-                return {'error': '缺少请求数据'}, 400
-                
-            # 检查请求类型
-            assessment_type = data.get('assessment_type', 'general')
+            if not data or 'messages' not in data:
+                return {'error': '请求中缺少messages字段'}, 400
             
-            # 如果是直接消息传递方式
-            if 'messages' in data:
-                messages = data.get('messages', [])
-                temperature = data.get('temperature', 0.7)
-                max_tokens = data.get('max_tokens', 2000)
-                
-                logger.info(f"DeepSeek对话请求(直接消息) - 用户ID: {current_user_id}, 消息数: {len(messages)}")
-                
-                # 调用DeepSeek API
-                response = deepseek.chat(messages, temperature, max_tokens)
-                
-            # 如果是风险评估请求
-            elif assessment_type == 'risk':
-                # 获取治疗方案信息
-                disease = data.get('disease', '')
-                treatment_plan = data.get('treatment_plan', '')
-                plan_description = data.get('plan_description', '')
-                treatment_duration = data.get('treatment_duration', '')
-                population = data.get('population', '一般人群')
-                
-                logger.info(f"DeepSeek风险评估请求 - 用户ID: {current_user_id}, 疾病: {disease}, 方案: {treatment_plan}")
-                
-                # 格式化提示
-                messages = dp.format_risk_assessment_prompt(
-                    disease, treatment_plan, plan_description, treatment_duration, population
-                )
-                
-                # 调用DeepSeek API
-                response = deepseek.chat(messages, temperature=0.5, max_tokens=2000)
-                
-                # 解析风险评估响应
-                risk_data = dp.parse_risk_assessment_response(response)
-                if risk_data:
-                    return {'risk_assessment': risk_data}, 200
-                
-            # 如果是便利度评估请求
-            elif assessment_type == 'convenience':
-                # 获取治疗方案信息
-                disease = data.get('disease', '')
-                treatment_plan = data.get('treatment_plan', '')
-                plan_description = data.get('plan_description', '')
-                treatment_duration = data.get('treatment_duration', '')
-                treatment_frequency = data.get('treatment_frequency', '')
-                
-                logger.info(f"DeepSeek便利度评估请求 - 用户ID: {current_user_id}, 疾病: {disease}, 方案: {treatment_plan}")
-                
-                # 构造消息
-                messages = [
-                    {"role": "system", "content": dp.CONVENIENCE_ASSESSMENT_SYSTEM_PROMPT},
-                    {"role": "user", "content": dp.CONVENIENCE_ASSESSMENT_USER_PROMPT_TEMPLATE.format(
-                        disease=disease,
-                        treatment_plan=treatment_plan,
-                        plan_description=plan_description,
-                        treatment_duration=treatment_duration,
-                        treatment_frequency=treatment_frequency
-                    )}
-                ]
-                
-                # 调用DeepSeek API
-                response = deepseek.chat(messages, temperature=0.5, max_tokens=2000)
-                
-                # 返回原始响应，由前端或后续处理解析
-                
-            else:
-                return {'error': f'不支持的评估类型: {assessment_type}'}, 400
+            messages = data.get('messages', [])
+            temperature = data.get('temperature', 0.7)
+            max_tokens = data.get('max_tokens', 2000)
+            use_predefined = data.get('use_predefined', True)  # 新增参数，是否使用预设问答
+            
+            logger.info(f"DeepSeek对话请求 - 用户ID: {current_user_id}, 消息数: {len(messages)}")
+            
+            # 调用DeepSeek API
+            response = deepseek.chat(messages, temperature, max_tokens, use_predefined)
             
             # 检查是否有错误
             if 'error' in response:
@@ -1834,6 +1772,47 @@ class DeepSeekHealth(Resource):
             logger.error(f"DeepSeek健康检查出错: {str(e)}")
             return {'status': 'error', 'message': f'检查DeepSeek API状态时发生错误: {str(e)}'}, 500
 
+# 新增: DeepSeek预设问答管理
+class DeepSeekPredefinedQA(Resource):
+    @jwt_required()
+    def get(self):
+        """获取所有预设问答"""
+        try:
+            if not deepseek.predefined_qa:
+                return {'predefined_qa': {}}, 200
+                
+            return {'predefined_qa': deepseek.predefined_qa}, 200
+        except Exception as e:
+            logger.error(f"获取预设问答出错: {str(e)}")
+            return {'error': f'获取预设问答时发生错误: {str(e)}'}, 500
+    
+    @jwt_required()
+    def post(self):
+        """添加或更新预设问答"""
+        try:
+            current_user_id = get_jwt_identity()
+            
+            data = request.get_json()
+            
+            if not data or 'question' not in data or 'answer' not in data:
+                return {'error': '请求中缺少question或answer字段'}, 400
+            
+            question = data.get('question')
+            answer = data.get('answer')
+            
+            logger.info(f"添加预设问答 - 用户ID: {current_user_id}, 问题: {question}")
+            
+            success = deepseek.add_predefined_qa(question, answer)
+            
+            if success:
+                return {'message': '预设问答添加成功'}, 200
+            else:
+                return {'error': '预设问答添加失败'}, 500
+                
+        except Exception as e:
+            logger.error(f"添加预设问答出错: {str(e)}")
+            return {'error': f'添加预设问答时发生错误: {str(e)}'}, 500
+
 # 注册路由
 api.add_resource(Register, '/api/register')
 api.add_resource(Login, '/api/login')
@@ -1849,6 +1828,7 @@ api.add_resource(FixCardFrequency, '/api/fix-frequency')  # 添加卡片频次�
 api.add_resource(GetCardDetail, '/api/cards/detail/<string:card_id>')  # 获取单个卡片详情路由
 api.add_resource(ChatWithDeepSeek, '/api/chat')  # 添加DeepSeek对话API
 api.add_resource(DeepSeekHealth, '/api/deepseek/health')  # 添加DeepSeek健康检查API
+api.add_resource(DeepSeekPredefinedQA, '/api/predefined-qa')  # 添加预设问答管理API
 
 @app.route('/')
 def home():
@@ -1889,6 +1869,8 @@ def home():
                 <div class="api-item">• POST /api/upload - 上传数据</div>
                 <div class="api-item">• GET /api/cards - 搜索治疗卡片</div>
                 <div class="api-item">• POST /api/chat - 使用DeepSeek对话API</div>
+                <div class="api-item">• GET /api/predefined-qa - 获取所有预设问答</div>
+                <div class="api-item">• POST /api/predefined-qa - 添加预设问答</div>
             </div>
         </body>
     </html>
