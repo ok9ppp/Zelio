@@ -24,6 +24,7 @@ import urllib.parse
 import math
 import re
 from deepseek_client import DeepSeekClient
+import deepseek_prompts as dp  # 导入新创建的模块
 
 # 创建logs目录（如果不存在）
 os.makedirs('logs', exist_ok=True)
@@ -1739,17 +1740,77 @@ class ChatWithDeepSeek(Resource):
             # 获取请求数据
             data = request.get_json()
             
-            if not data or 'messages' not in data:
-                return {'error': '请求中缺少messages字段'}, 400
+            if not data:
+                return {'error': '缺少请求数据'}, 400
+                
+            # 检查请求类型
+            assessment_type = data.get('assessment_type', 'general')
             
-            messages = data.get('messages', [])
-            temperature = data.get('temperature', 0.7)
-            max_tokens = data.get('max_tokens', 2000)
-            
-            logger.info(f"DeepSeek对话请求 - 用户ID: {current_user_id}, 消息数: {len(messages)}")
-            
-            # 调用DeepSeek API
-            response = deepseek.chat(messages, temperature, max_tokens)
+            # 如果是直接消息传递方式
+            if 'messages' in data:
+                messages = data.get('messages', [])
+                temperature = data.get('temperature', 0.7)
+                max_tokens = data.get('max_tokens', 2000)
+                
+                logger.info(f"DeepSeek对话请求(直接消息) - 用户ID: {current_user_id}, 消息数: {len(messages)}")
+                
+                # 调用DeepSeek API
+                response = deepseek.chat(messages, temperature, max_tokens)
+                
+            # 如果是风险评估请求
+            elif assessment_type == 'risk':
+                # 获取治疗方案信息
+                disease = data.get('disease', '')
+                treatment_plan = data.get('treatment_plan', '')
+                plan_description = data.get('plan_description', '')
+                treatment_duration = data.get('treatment_duration', '')
+                population = data.get('population', '一般人群')
+                
+                logger.info(f"DeepSeek风险评估请求 - 用户ID: {current_user_id}, 疾病: {disease}, 方案: {treatment_plan}")
+                
+                # 格式化提示
+                messages = dp.format_risk_assessment_prompt(
+                    disease, treatment_plan, plan_description, treatment_duration, population
+                )
+                
+                # 调用DeepSeek API
+                response = deepseek.chat(messages, temperature=0.5, max_tokens=2000)
+                
+                # 解析风险评估响应
+                risk_data = dp.parse_risk_assessment_response(response)
+                if risk_data:
+                    return {'risk_assessment': risk_data}, 200
+                
+            # 如果是便利度评估请求
+            elif assessment_type == 'convenience':
+                # 获取治疗方案信息
+                disease = data.get('disease', '')
+                treatment_plan = data.get('treatment_plan', '')
+                plan_description = data.get('plan_description', '')
+                treatment_duration = data.get('treatment_duration', '')
+                treatment_frequency = data.get('treatment_frequency', '')
+                
+                logger.info(f"DeepSeek便利度评估请求 - 用户ID: {current_user_id}, 疾病: {disease}, 方案: {treatment_plan}")
+                
+                # 构造消息
+                messages = [
+                    {"role": "system", "content": dp.CONVENIENCE_ASSESSMENT_SYSTEM_PROMPT},
+                    {"role": "user", "content": dp.CONVENIENCE_ASSESSMENT_USER_PROMPT_TEMPLATE.format(
+                        disease=disease,
+                        treatment_plan=treatment_plan,
+                        plan_description=plan_description,
+                        treatment_duration=treatment_duration,
+                        treatment_frequency=treatment_frequency
+                    )}
+                ]
+                
+                # 调用DeepSeek API
+                response = deepseek.chat(messages, temperature=0.5, max_tokens=2000)
+                
+                # 返回原始响应，由前端或后续处理解析
+                
+            else:
+                return {'error': f'不支持的评估类型: {assessment_type}'}, 400
             
             # 检查是否有错误
             if 'error' in response:
