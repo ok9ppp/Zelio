@@ -1733,8 +1733,10 @@ class ChatWithDeepSeek(Resource):
     @jwt_required()
     def post(self):
         try:
+            # 获取当前用户ID
             current_user_id = get_jwt_identity()
             
+            # 获取请求数据
             data = request.get_json()
             
             if not data or 'messages' not in data:
@@ -1743,12 +1745,11 @@ class ChatWithDeepSeek(Resource):
             messages = data.get('messages', [])
             temperature = data.get('temperature', 0.7)
             max_tokens = data.get('max_tokens', 2000)
-            use_predefined = data.get('use_predefined', True)  # 新增参数，是否使用预设问答
             
             logger.info(f"DeepSeek对话请求 - 用户ID: {current_user_id}, 消息数: {len(messages)}")
             
             # 调用DeepSeek API
-            response = deepseek.chat(messages, temperature, max_tokens, use_predefined)
+            response = deepseek.chat(messages, temperature, max_tokens)
             
             # 检查是否有错误
             if 'error' in response:
@@ -1772,47 +1773,6 @@ class DeepSeekHealth(Resource):
             logger.error(f"DeepSeek健康检查出错: {str(e)}")
             return {'status': 'error', 'message': f'检查DeepSeek API状态时发生错误: {str(e)}'}, 500
 
-# 新增: DeepSeek预设问答管理
-class DeepSeekPredefinedQA(Resource):
-    @jwt_required()
-    def get(self):
-        """获取所有预设问答"""
-        try:
-            if not deepseek.predefined_qa:
-                return {'predefined_qa': {}}, 200
-                
-            return {'predefined_qa': deepseek.predefined_qa}, 200
-        except Exception as e:
-            logger.error(f"获取预设问答出错: {str(e)}")
-            return {'error': f'获取预设问答时发生错误: {str(e)}'}, 500
-    
-    @jwt_required()
-    def post(self):
-        """添加或更新预设问答"""
-        try:
-            current_user_id = get_jwt_identity()
-            
-            data = request.get_json()
-            
-            if not data or 'question' not in data or 'answer' not in data:
-                return {'error': '请求中缺少question或answer字段'}, 400
-            
-            question = data.get('question')
-            answer = data.get('answer')
-            
-            logger.info(f"添加预设问答 - 用户ID: {current_user_id}, 问题: {question}")
-            
-            success = deepseek.add_predefined_qa(question, answer)
-            
-            if success:
-                return {'message': '预设问答添加成功'}, 200
-            else:
-                return {'error': '预设问答添加失败'}, 500
-                
-        except Exception as e:
-            logger.error(f"添加预设问答出错: {str(e)}")
-            return {'error': f'添加预设问答时发生错误: {str(e)}'}, 500
-
 # 注册路由
 api.add_resource(Register, '/api/register')
 api.add_resource(Login, '/api/login')
@@ -1828,7 +1788,6 @@ api.add_resource(FixCardFrequency, '/api/fix-frequency')  # 添加卡片频次�
 api.add_resource(GetCardDetail, '/api/cards/detail/<string:card_id>')  # 获取单个卡片详情路由
 api.add_resource(ChatWithDeepSeek, '/api/chat')  # 添加DeepSeek对话API
 api.add_resource(DeepSeekHealth, '/api/deepseek/health')  # 添加DeepSeek健康检查API
-api.add_resource(DeepSeekPredefinedQA, '/api/predefined-qa')  # 添加预设问答管理API
 
 @app.route('/')
 def home():
@@ -1869,8 +1828,6 @@ def home():
                 <div class="api-item">• POST /api/upload - 上传数据</div>
                 <div class="api-item">• GET /api/cards - 搜索治疗卡片</div>
                 <div class="api-item">• POST /api/chat - 使用DeepSeek对话API</div>
-                <div class="api-item">• GET /api/predefined-qa - 获取所有预设问答</div>
-                <div class="api-item">• POST /api/predefined-qa - 添加预设问答</div>
             </div>
         </body>
     </html>
